@@ -11,7 +11,7 @@ class OrderRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -22,7 +22,8 @@ class OrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'hold_id' => 'required|string',
+            'payment_intent_id' => 'required|string',
         ];
     }
 }

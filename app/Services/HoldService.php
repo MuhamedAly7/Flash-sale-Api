@@ -2,18 +2,19 @@
 
 namespace App\Services;
 
+use App\Contracts\ProductRepositoryInterface;
 use App\Repositories\ProductRepository;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
 class HoldService
 {
-    protected $redis;
+    public $redis;
     protected $productRepository;
     protected const STOCK_KEY_PREFIX = 'product:';
     protected const HOLD_PREFIX      = 'holds:';
 
-    public function __construct(ProductRepository $productRepository)
+    public function __construct(ProductRepositoryInterface $productRepository)
     {
         // Direct connection — bypass Laravel config hell
         $this->redis = new \Redis();
@@ -65,5 +66,23 @@ LUA;
     public function commit(string $holdId): void
     {
         $this->redis->del(self::HOLD_PREFIX . $holdId);
+    }
+
+    public function getHoldData(string $holdId): ?array
+    {
+        $data = $this->redis->hGetAll(self::HOLD_PREFIX . $holdId);
+        return !empty($data) ? $data : null;
+    }
+
+    public function getCurrentStock(int $productId): int
+    {
+        $stockKey = self::STOCK_KEY_PREFIX . $productId . ':available_stock';
+
+        if (!$this->redis->exists($stockKey)) {
+            $dbStock = $this->productRepository->getAvailableStock($productId);
+            $this->redis->set($stockKey, $dbStock);
+        }
+
+        return (int) $this->redis->get($stockKey);
     }
 }
