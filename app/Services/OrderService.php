@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\OrderRepositoryInterface;
 use App\Contracts\ProductRepositoryInterface;
+use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
 
@@ -60,33 +61,44 @@ class OrderService
 
     public function confirmPayment(string $holdId, string $paymentIntentId): void
     {
-        DB::transaction(function () use ($holdId, $paymentIntentId) {
-            $order = $this->orderRepository->findByHoldId($holdId);
+        $order = $this->orderRepository->findByHoldId($holdId);
 
-            if (!$order || $order->status !== 'pending') {
-                throw new \DomainException('Invalid or already processed order', 410);
-            }
+        if (!$order || $order->status !== 'pending') {
+            throw new \DomainException('Order not found or already processed', 410);
+        }
 
-            if ($order->payment_intent_id !== $paymentIntentId) {
-                throw new \DomainException('Payment intent mismatch', 400);
-            }
+        if ($order->payment_intent_id !== $paymentIntentId) {
+            throw new \DomainException('Payment intent mismatch', 400);
+        }
 
+        // before any transaction
+        $holdExists = $this->holdService->holdExists($holdId);
+
+        if (!$holdExists) {
+            $this->markOrderAsExpired($order);
+            throw new \DomainException('Hold expired — order canceled', 410);
+        }
+
+        DB::transaction(function () use ($order, $holdId) {
             $this->holdService->commit($holdId);
 
-            $productId = $order->product_id;
-            $quantity = $order->quantity;
-
-            $affected = Product::where('id', $productId)
-                ->where('stock', '>=', $quantity)
-                ->decrement('stock', $quantity);
+            $affected = Product::where('id', $order->product_id)
+                ->where('available_stock', '>=', $order->quantity)
+                ->decrement('available_stock', $order->quantity);
 
             if ($affected === 0) {
-                throw new \DomainException('Insufficient stock to complete the order', 409);
+                throw new \DomainException('Stock inconsistency', 500);
             }
 
-            $order->update([
-                'status' => 'paid'
-            ]);
+            $order->update(['status' => 'paid']);
+        });
+    }
+
+    private function markOrderAsExpired(Order $order): void
+    {
+        DB::transaction(function () use ($order) {
+            $order->status = 'failed';
+            $order->save();
         });
     }
 

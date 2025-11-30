@@ -18,17 +18,10 @@ class WebhookController extends Controller
 
     public function paymentSuccess(OrderRequest $request)
     {
-        $holdId = $request->validated('hold_id');
-        $paymentIntentId = $request->validated('payment_intent_id');
-
-        if (!$holdId || !$paymentIntentId) {
-            return ApiResponse::error('Missing hold_id or payment_intent_id', [], 400);
-        }
-
         try {
-            $this->orderService->confirmPayment($holdId, $paymentIntentId);
+            $this->orderService->confirmPayment($request->hold_id, $request->payment_intent_id);
             return ApiResponse::success('Payment confirmed. Stock permanently reserved.', [
-                'hold_id' => $holdId,
+                'hold_id' => $request->hold_id,
                 'status' => 'paid'
             ]);
         } catch (\DomainException $e) {

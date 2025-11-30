@@ -85,4 +85,9 @@ LUA;
 
         return (int) $this->redis->get($stockKey);
     }
+
+    public function holdExists(string $holdId): bool
+    {
+        return $this->redis->exists("holds:{$holdId}") === 1;
+    }
 }
