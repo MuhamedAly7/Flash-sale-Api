@@ -75,7 +75,7 @@ class OrderService
         $holdExists = $this->holdService->holdExists($holdId);
 
         if (!$holdExists) {
-            $this->markOrderAsExpired($order);
+            $this->markOrderAsFailed($order);
             throw new \DomainException('Hold expired — order canceled', 410);
         }
 
@@ -94,12 +94,9 @@ class OrderService
         });
     }
 
-    private function markOrderAsExpired(Order $order): void
+    private function markOrderAsFailed(Order $order): void
     {
-        DB::transaction(function () use ($order) {
-            $order->status = 'failed';
-            $order->save();
-        });
+        $order->update(['status' => 'failed']);
     }
 
     private function extractProductId(string $stockKey): int

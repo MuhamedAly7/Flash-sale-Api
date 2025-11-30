@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedInteger('quantity');
             $table->decimal('unit_price', 12, 2);
             $table->decimal('total_price', 12, 2);
-            $table->string('hold_id');
+            $table->string('hold_id')->unique();
             $table->string('status')->default('pending'); // pending → paid → failed
             $table->string('payment_intent_id')->nullable();
             $table->json('payment_data')->nullable();
