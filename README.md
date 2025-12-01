@@ -34,6 +34,23 @@ cd flash-sale-api
 # Copy env
 cp .env.example .env
 
+update .env with your settings (DB, Redis, etc.)
+
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=flash_sale
+DB_USERNAME=root
+DB_PASSWORD=secret
+CACHE_DRIVER=redis
+REDIS_HOST=redis
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=redis
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+
 # Start containers
 docker compose up -d --build
 
