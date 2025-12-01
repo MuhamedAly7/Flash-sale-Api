@@ -23,7 +23,6 @@ return new class extends Migration
             $table->json('payment_data')->nullable();
             $table->timestamps();
 
-            $table->unique('hold_id');
             $table->index(['status', 'created_at']);
         });
     }
