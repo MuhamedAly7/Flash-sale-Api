@@ -61,6 +61,9 @@ docker compose exec app php artisan migrate --seed
 # Clear cache
 docker compose exec app php artisan optimize:clear
 
+# Generate App Key
+docker compose exec app php artisan key:generate
+
 # Access API at http://localhost:8000
 ```
 
