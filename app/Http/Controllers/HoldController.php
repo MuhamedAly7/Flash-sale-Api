@@ -12,7 +12,8 @@ class HoldController extends Controller
     {
         $holdId = $holdService->hold(
             productId: $request->validated('product_id'),
-            quantity: $request->validated('quantity')
+            quantity: $request->validated('quantity'),
+            ttlSeconds: $request->validated('ttl_seconds'),
         );
 
         if (!$holdId) {
@@ -21,7 +22,7 @@ class HoldController extends Controller
 
         return ApiResponse::success('Stock held successfully', [
             'hold_id' => $holdId,
-            'expires_in_seconds' => 120
+            'expires_in_seconds' => $request->validated('ttl_seconds') ?? 120,
         ]);
     }
 }

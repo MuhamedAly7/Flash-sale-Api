@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Contracts\ProductRepositoryInterface;
 use App\Repositories\ProductRepository;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 
 class HoldService
 {
@@ -24,43 +23,73 @@ class HoldService
 
     public function hold(int $productId, int $quantity, int $ttlSeconds = 120): ?string
     {
-        $stockKey = self::STOCK_KEY_PREFIX . $productId . ':available_stock';
-        $holdId   = (string) Str::uuid();
-
-        // Sync from DB only if Redis key doesn't exist
-        if (!$this->redis->exists($stockKey)) {
-            $dbStock = $this->productRepository->getAvailableStock($productId);
-            $this->redis->set($stockKey, $dbStock);
-        }
+        $stockKey = "product:{$productId}:available_stock";
+        $holdId   = (string) \Str::uuid();
 
         $lua = <<<LUA
-        local current = tonumber(redis.call('GET', KEYS[1]) or '0')
-        local qty     = tonumber(ARGV[1])
+        local stock_key = KEYS[1]
+        local qty       = tonumber(ARGV[1])
+        local hold_id   = ARGV[2]
+        local ttl       = tonumber(ARGV[3])
+        local db_stock  = tonumber(ARGV[4])
 
+        -- If stock key missing → it means all holds expired → restore from DB
+        if redis.call('EXISTS', stock_key) == 0 then
+            redis.call('SET', stock_key, db_stock)
+            redis.call('EXPIRE', stock_key, ttl + 30) -- safety
+        end
+
+        local current = tonumber(redis.call('GET', stock_key))
         if current < qty then
             return 0
         end
 
-        redis.call('DECRBY', KEYS[1], qty)
-        redis.call('HSET', 'holds:'..ARGV[2], 'stock_key', KEYS[1], 'quantity', qty)
-        redis.call('EXPIRE', KEYS[1], ARGV[3])
-        redis.call('EXPIRE', 'holds:'..ARGV[2], ARGV[3])
+        -- Deduct stock
+        redis.call('DECRBY', stock_key, qty)
+
+        -- Create hold metadata
+        redis.call('HSET', 'holds:'..hold_id,
+            'product_id', {$productId},
+            'quantity', qty
+        )
+
+        -- CRITICAL: Expire both keys
+        redis.call('EXPIRE', stock_key, ttl)
+        redis.call('EXPIRE', 'holds:'..hold_id, ttl)
 
         return 1
 LUA;
 
-        $result = $this->redis->eval($lua, [$stockKey, $quantity, $holdId, $ttlSeconds], 1);
+        $dbStock = $this->productRepository->getAvailableStock($productId);
+
+        $result = $this->redis->eval($lua, [
+            $stockKey,
+            $quantity,
+            $holdId,
+            $ttlSeconds,
+            $dbStock
+        ], 1);
 
         return $result === 1 ? $holdId : null;
     }
 
     public function release(string $holdId): void
     {
-        $data = $this->redis->hGetAll(self::HOLD_PREFIX . $holdId);
-        if (empty($data['stock_key'] ?? null)) return;
+        $holdKey = "holds:{$holdId}";
+        $qtyKey  = "hold_qty:{$holdId}";
 
-        $this->redis->incrBy($data['stock_key'], $data['quantity']);
-        $this->redis->del(self::HOLD_PREFIX . $holdId);
+        $data = $this->redis->hGetAll($holdKey);
+        $quantity = (int) ($data['quantity'] ?? $this->redis->get($qtyKey) ?? 0);
+
+        if ($quantity > 0 && isset($data['product_id'])) {
+            $stockKey = "product:{$data['product_id']}:available_stock";
+            if ($this->redis->exists($stockKey)) {
+                $this->redis->incrby($stockKey, $quantity);
+            }
+        }
+
+        $this->redis->del($holdKey);
+        $this->redis->del($qtyKey);
     }
 
     public function commit(string $holdId): void
