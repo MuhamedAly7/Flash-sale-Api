@@ -132,3 +132,7 @@ docker compose exec app php artisan key:generate
     - Errors: 404 Not Found
     - Description: Retrieves product details including real-time available stock.
     - Stock Calculation: `available_stock = total_stock - reserved_in_holds - sold_in_orders`
+
+## Testing APIs
+
+- Import Postman collection Called `Flash-Sale-API.postman_collection.json` in root directory.
