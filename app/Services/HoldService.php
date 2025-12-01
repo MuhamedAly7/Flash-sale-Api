@@ -33,10 +33,9 @@ class HoldService
         local ttl       = tonumber(ARGV[3])
         local db_stock  = tonumber(ARGV[4])
 
-        -- If stock key missing → it means all holds expired → restore from DB
+        -- Restore from DB if key gone
         if redis.call('EXISTS', stock_key) == 0 then
             redis.call('SET', stock_key, db_stock)
-            redis.call('EXPIRE', stock_key, ttl + 30) -- safety
         end
 
         local current = tonumber(redis.call('GET', stock_key))
@@ -44,18 +43,19 @@ class HoldService
             return 0
         end
 
-        -- Deduct stock
         redis.call('DECRBY', stock_key, qty)
 
-        -- Create hold metadata
+        -- STORE stock_key so OrderService can find it later
         redis.call('HSET', 'holds:'..hold_id,
             'product_id', {$productId},
-            'quantity', qty
+            'quantity', qty,
+            'stock_key', stock_key
         )
 
-        -- CRITICAL: Expire both keys
-        redis.call('EXPIRE', stock_key, ttl)
         redis.call('EXPIRE', 'holds:'..hold_id, ttl)
+
+        -- For automatic expiry return
+        redis.call('SET', 'expired_hold:'..hold_id, qty, 'EX', ttl + 60)
 
         return 1
 LUA;
