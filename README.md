@@ -24,6 +24,9 @@ HoldService (Redis + Lua)
 OrderService → DB deduction on payment success
 ```
 
+# Prerequisites
+### - Docker & Docker Compose installed
+
 ## Setup
 
 ```
