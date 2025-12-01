@@ -15,7 +15,6 @@ class HoldService
 
     public function __construct(ProductRepositoryInterface $productRepository)
     {
-        // Direct connection — bypass Laravel config hell
         $this->redis = new \Redis();
         $this->redis->connect('redis', 6379);
         $this->productRepository = $productRepository;

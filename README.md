@@ -1,59 +1,114 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Flash Sale API - Unbreakable, Zero-Oversell, Production-Ready
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Built with Laravel 12 + Redis + Lua + Docker  
+Tested under 1000+ concurrent requests — **never oversells**
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Atomic stock reservation using Redis + Lua script
+- Zero overselling - even under extreme concurrency
+- Holds expire after 2 minutes → stock automatically returned
+- Real orders created from holds
+- Idempotent payment webhooks
+- Real-time available stock
+- Docker + Nginx + PHP 8.3 + Redis
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Architecture Overview
+```
+User → Nginx → Laravel API
+↓
+HoldService (Redis + Lua)
+↓
+→ holds:{uuid} + expired_hold:{uuid}
+↓
+OrderService → DB deduction on payment success
+```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Setup
 
-## Learning Laravel
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+git clone https://github.com/your-repo/flash-sale-api.git
+cd flash-sale-api
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+# Copy env
+cp .env.example .env
 
-## Laravel Sponsors
+# Start containers
+docker compose up -d --build
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+# Install dependencies + migrate
+docker compose exec app composer install --optimize-autoloader --no-dev
+docker compose exec app php artisan migrate --seed
 
-### Premium Partners
+# Clear cache
+docker compose exec app php artisan optimize:clear
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+# Access API at http://localhost:8000
+```
 
-## Contributing
+## API Endpoints
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- `POST /api/holds` - Create a stock hold
+  - Body: `{ "product_id": 1, "quantity": 2, "ttl": 120 }`
+    - Response: 
+      - ```{
+        "status": "success",
+        "message": "Stock held successfully",
+        "data": {
+            "hold_id": "fd6ca91c-7fec-4856-aa85-2bcb600c18d4",
+            "expires_in_seconds": 120}}
+  - Errors: 400 Bad Request, 409 Conflict (insufficient stock)
+  - Description: Atomically reserves stock for a limited time.
+  - Concurrency: Safe under 1000+ concurrent requests.
+  - TTL: Hold expires after specified seconds (default 120s).
+  
+- `POST /api/orders` - Create an order from a hold
+  - Body: `{ "hold_id": "uuid", "payment_intent_id": "pi_12345" }`
+  - Response: 
+    - ```{
+      "status": "success",
+      "message": "Order created successfully",
+      "data": {
+          "order_id": 18,
+          "status": "pending",
+          "amount": 1198,
+          "currency": "USD",
+          "pay_with": "payment_intent_id: pi_123456789"
+      }
+  - Errors: 400 Bad Request, 404 Not Found (invalid hold), 409 Conflict (hold expired)
+  - Description: Converts a valid hold into a real order.
 
-## Code of Conduct
+- `POST /api/webhooks/payment` - Payment webhook
+  - Body: 
+    - ```{
+      "hold_id": "fd6ca91c-7fec-4856-aa85-2bcb600c18d4",
+      "payment_intent_id": "pi_123456789"
+      }
+  - Response: 
+    - ```{
+      "status": "success",
+      "message": "Payment processed successfully"
+  - Errors: 400 Bad Request, 404 Not Found (invalid payment_intent_id)
+  - Description: Idempotently processes payment notifications.
+  - Idempotency: Safe to call multiple times for the same payment_intent_id.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- `GET /api/products/{id}` - Get available stock
+  - Response: 
+    - ```{
+          "status": "success",
+          "message": "Product retrieved",
+          "data": {
+              "id": 1,
+              "name": "iPhone 15 Pro Max – Flash Sale Edition",
+              "description": "Limited 100 units – 50% off for the first 60 seconds",
+              "price": 599,
+              "total_stock": 100,
+              "available_stock": 100,
+              "is_sold_out": false
+          }
+        }
+      
+    - Errors: 404 Not Found
+    - Description: Retrieves product details including real-time available stock.
+    - Stock Calculation: `available_stock = total_stock - reserved_in_holds - sold_in_orders`
