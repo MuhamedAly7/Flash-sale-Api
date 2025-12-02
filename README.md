@@ -102,7 +102,7 @@ docker compose exec app php artisan key:generate
   - Errors: 400 Bad Request, 404 Not Found (invalid hold), 409 Conflict (hold expired)
   - Description: Converts a valid hold into a real order.
 
-- `POST /api/webhooks/payment` - Payment webhook
+- `POST /api/webhook/payment-success` - Payment webhook
   - Body: 
     - ```{
       "hold_id": "fd6ca91c-7fec-4856-aa85-2bcb600c18d4",
