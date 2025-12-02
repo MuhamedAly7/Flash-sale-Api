@@ -13,7 +13,7 @@ class HoldController extends Controller
         $holdId = $holdService->hold(
             productId: $request->validated('product_id'),
             quantity: $request->validated('quantity'),
-            ttlSeconds: $request->validated('ttl_seconds'),
+            ttlSeconds: $request->validated('ttl_seconds') ?? 120,
         );
 
         if (!$holdId) {

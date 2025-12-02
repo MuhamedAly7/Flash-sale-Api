@@ -3,10 +3,11 @@
 namespace App\Http\Requests;
 
 use App\Helpers\ApiResponse;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Contracts\Validation\Validator;
-class OrderRequest extends FormRequest
+
+class WebhookPaymentSuccessRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -31,6 +32,6 @@ class OrderRequest extends FormRequest
 
     public function failedValidation(Validator $validator)
     {
-        throw new HttpResponseException(ApiResponse::error("Order Error", $validator->errors()->toArray(), 422));
+        throw new HttpResponseException(ApiResponse::error("Payment process error", $validator->errors()->toArray(), 422));
     }
 }

@@ -27,7 +27,7 @@ class HoldRequest extends FormRequest
         return [
             'product_id' => 'required|exists:products,id',
             'quantity'   => 'required|integer|min:1',
-            'ttl_seconds' => 'sometimes|integer|min:3|max:300',
+            'ttl_seconds' => 'integer|min:3|max:300',
         ];
     }
 

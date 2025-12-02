@@ -3,9 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\ApiResponse;
-use App\Http\Requests\OrderRequest;
+use App\Http\Requests\WebhookPaymentSuccessRequest;
 use App\Services\OrderService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 class WebhookController extends Controller
@@ -17,7 +16,7 @@ class WebhookController extends Controller
         $this->orderService = $orderService;
     }
 
-    public function paymentSuccess(OrderRequest $request)
+    public function paymentSuccess(WebhookPaymentSuccessRequest $request)
     {
         $idempotencyKey = $request->header('Idempotency-Key');
 
