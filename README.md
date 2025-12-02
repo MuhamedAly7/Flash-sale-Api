@@ -31,7 +31,7 @@ OrderService → DB deduction on payment success
 
 ```
 
-git clone https://github.com/your-repo/flash-sale-api.git
+git clone https://github.com/MuhamedAly7/Flash-sale-Api.git
 cd flash-sale-api
 
 # Copy env
