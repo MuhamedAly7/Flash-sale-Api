@@ -28,8 +28,8 @@ class WebhookController extends Controller
         $cacheKey = "webhook:processed:{$idempotencyKey}";
 
         if (Cache::has($cacheKey)) {
-            return ApiResponse::success('Already processed', [
-                'status' => 'already_processed'
+            return ApiResponse::success('Already processed or Invalid key', [
+                'status' => 'already_processed or invalid key'
             ]);
         }
 
